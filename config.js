@@ -27,17 +27,21 @@ config = {
         // ```
 
         database: {
-            client: 'sqlite3',
+            client: 'postgres',
             connection: {
-                filename: path.join(__dirname, '/content/data/ghost-dev.db')
-            },
-            debug: false
+		host: 'ec2-54-204-37-92.compute-1.amazonaws.com',
+		user: 'fjcvzjvisivrlr',
+		password: 'oI4oBlRAEs6_1p1vGB7ZgG3og9',
+      		database: 'df34hls8dg8daj',
+		port: '5432'
+	    },
+	    debug: false
         },
         server: {
             // Host to be passed to node's `net.Server#listen()`
-            host: '127.0.0.1',
+            host: '0.0.0.0',
             // Port to be passed to node's `net.Server#listen()`, for iisnode set this to `process.env.PORT`
-            port: '2368'
+            port: process.env.PORT
         },
         paths: {
             contentPath: path.join(__dirname, '/content/')
@@ -62,7 +66,8 @@ config = {
             host: '127.0.0.1',
             // Port to be passed to node's `net.Server#listen()`, for iisnode set this to `process.env.PORT`
             port: '2368'
-        }
+        },
+	fileStorage: false
     },
 
     // **Developers only need to edit below here**
