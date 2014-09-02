@@ -29,10 +29,10 @@ config = {
         database: {
             client: 'postgres',
             connection: {
-		host: 'ec2-54-204-37-92.compute-1.amazonaws.com',
-		user: 'fjcvzjvisivrlr',
-		password: 'oI4oBlRAEs6_1p1vGB7ZgG3og9',
-      		database: 'df34hls8dg8daj',
+		host: process.env.POSTGRES_HOST,
+		user: process.env.POSTGRES_USER,
+		password: process.env.POSTGRES_PASSWORD,
+      		database: process.env.POSTGRES_DATABASE,
 		port: '5432'
 	    },
 	    debug: false
