@@ -10,7 +10,16 @@ config = {
     development: {
         // The url to use when providing links to the site, E.g. in RSS and email.
         url: 'http://ricca509.me',
-
+        mail: {
+            transport: 'SMTP',
+            options: {
+                service: 'Mailgun',
+                auth: {
+                    user: process.env.MAILGUN_USER,
+                    pass: process.env.MAILGUN_PWD
+                }
+            }
+        },
         database: {
             client: 'sqlite3',
             connection: {
@@ -35,9 +44,16 @@ config = {
     production: {
         // The url to use when providing links to the site, E.g. in RSS and email.
         url: 'http://ricca509.me',
-
-        mail: {},
-
+        mail: {
+            transport: 'SMTP',
+            options: {
+                service: 'Mailgun',
+                auth: {
+                    user: process.env.MAILGUN_USER,
+                    pass: process.env.MAILGUN_PWD
+                }
+            }
+        },
         database: {
             client: 'postgres',
             connection: {
