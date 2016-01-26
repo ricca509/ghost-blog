@@ -1,11 +1,10 @@
 var _               = require('lodash'),
-    when            = require('when'),
+    Promise         = require('bluebird'),
+    crypto          = require('crypto'),
+    sequence        = require('../../utils/sequence'),
     path            = require('path'),
     fs              = require('fs'),
-    nodefn          = require('when/node'),
     errors          = require('../../errors'),
-    sequence        = require('when/sequence'),
-
     commands        = require('./commands'),
     versioning      = require('../versioning'),
     models          = require('../../models'),
@@ -21,6 +20,7 @@ var _               = require('lodash'),
     logInfo,
     populateDefaultSettings,
     backupDatabase,
+    fixClientSecret,
 
     // public
     init,
@@ -35,7 +35,7 @@ logInfo = function logInfo(message) {
 populateDefaultSettings = function populateDefaultSettings() {
     // Initialise the default settings
     logInfo('Populating default settings');
-    return models.Settings.populateDefault('databaseVersion').then(function () {
+    return models.Settings.populateDefaults().then(function () {
         logInfo('Complete');
     });
 };
@@ -47,9 +47,22 @@ backupDatabase = function backupDatabase() {
         return dataExport.fileName().then(function (fileName) {
             fileName = path.resolve(config.paths.contentPath + '/data/' + fileName);
 
-            return nodefn.call(fs.writeFile, fileName, JSON.stringify(exportedData)).then(function () {
+            return Promise.promisify(fs.writeFile)(fileName, JSON.stringify(exportedData)).then(function () {
                 logInfo('Database backup written to: ' + fileName);
             });
+        });
+    });
+};
+
+// TODO: move to migration.to005() for next DB version
+fixClientSecret = function () {
+    return models.Clients.forge().query('where', 'secret', '=', 'not_available').fetch().then(function updateClients(results) {
+        return Promise.map(results.models, function mapper(client) {
+            if (process.env.NODE_ENV.indexOf('testing') !== 0) {
+                logInfo('Updating client secret');
+                client.secret = crypto.randomBytes(6).toString('hex');
+            }
+            return models.Client.edit(client, {context: {internal: true}, id: client.id});
         });
     });
 };
@@ -80,7 +93,8 @@ init = function (tablesOnly) {
         if (databaseVersion === defaultVersion) {
             // 1. The database exists and is up-to-date
             logInfo('Up to date at version ' + databaseVersion);
-            return when.resolve();
+            // TODO: temporary fix for missing client.secret
+            return fixClientSecret();
         }
 
         if (databaseVersion > defaultVersion) {
@@ -120,11 +134,11 @@ reset = function () {
 migrateUpFreshDb = function (tablesOnly) {
     var tableSequence,
         tables = _.map(schemaTables, function (table) {
-        return function () {
-            logInfo('Creating table: ' + table);
-            return utils.createTable(table);
-        };
-    });
+            return function () {
+                logInfo('Creating table: ' + table);
+                return utils.createTable(table);
+            };
+        });
     logInfo('Creating tables...');
     tableSequence = sequence(tables);
 
@@ -155,7 +169,7 @@ migrateUp = function (fromVersion, toVersion) {
     }).then(function () {
         migrateOps = migrateOps.concat(commands.getDeleteCommands(oldTables, schemaTables));
         migrateOps = migrateOps.concat(commands.getAddCommands(oldTables, schemaTables));
-        return when.all(
+        return Promise.all(
             _.map(oldTables, function (table) {
                 return utils.getIndexes(table).then(function (indexes) {
                     modifyUniCommands = modifyUniCommands.concat(commands.modifyUniqueCommands(table, indexes));
@@ -163,27 +177,28 @@ migrateUp = function (fromVersion, toVersion) {
             })
         );
     }).then(function () {
-        return when.all(
+        return Promise.all(
             _.map(oldTables, function (table) {
                 return utils.getColumns(table).then(function (columns) {
                     migrateOps = migrateOps.concat(commands.addColumnCommands(table, columns));
                 });
             })
         );
-
     }).then(function () {
         migrateOps = migrateOps.concat(_.compact(modifyUniCommands));
 
         // execute the commands in sequence
         if (!_.isEmpty(migrateOps)) {
             logInfo('Running migrations');
+
             return sequence(migrateOps);
         }
-        return;
     }).then(function () {
-        return fixtures.update(fromVersion, toVersion);
-    }).then(function () {
+        // Ensure all of the current default settings are created (these are fixtures, so should be inserted first)
         return populateDefaultSettings();
+    }).then(function () {
+        // Finally, run any updates to the fixtures, including default settings
+        return fixtures.update(fromVersion, toVersion);
     });
 };
 
