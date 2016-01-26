@@ -9,7 +9,7 @@ config = {
     // ### Development **(default)**
     development: {
         // The url to use when providing links to the site, E.g. in RSS and email.
-        url: 'http://ricca509.me',
+        url: 'http://blog.ricca509.me',
         mail: {
             transport: 'SMTP',
             options: {
